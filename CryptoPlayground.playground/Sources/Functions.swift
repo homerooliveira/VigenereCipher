@@ -1,18 +1,16 @@
 import Foundation
 
-public func calculateKeyLengths(cipherText: String) -> [KeyLength] {
-    let alphabetLength = 26
-    let portugueseIC = 0.072723
+public func calculateKeyLengths(cipherText: String, indexOfCoincidence: Double) -> [KeyLength] {
+    let alphabetLength = 13
     var lengths: [KeyLength] = []
-    
     
     for length in 0..<alphabetLength {
         lengths.append(keyLengths(for: length + 1, with: cipherText))
     }
     
     lengths.sort(by: { (lhs, rhs) in
-        portugueseIC - lhs.indicesOfCoincidence.first!
-            < portugueseIC - rhs.indicesOfCoincidence.first!
+        indexOfCoincidence - lhs.indicesOfCoincidence.average
+            < indexOfCoincidence - rhs.indicesOfCoincidence.average
     })
     
     return lengths
@@ -23,7 +21,7 @@ public func keyLengths(for length: Int, with cipherText: String) -> KeyLength {
     
     let indicesOfCoincidence = lengthsGroup.map { (characters) -> Double in
         let occurrences = countOccurrence(of: characters)
-        let indexOfCoincidence = calculateIndeOfCoincidence(of: occurrences)
+        let indexOfCoincidence = calculateIndexOfCoincidence(of: occurrences)
         return indexOfCoincidence
     }
     
@@ -50,14 +48,7 @@ public func groupCharacters(for length: Int, with cipherText: String) -> [[Chara
     return lengthsGroup
 }
 
-public func groupCharacterByFrequencies(for length: Int, with cipherText: String) -> [[(Character, Int)]] {
-    return groupCharacters(for: length, with: cipherText)
-        .map({ (characters) in
-            Array(countOccurrence(of: characters))
-        })
-}
-
-public func calculateIndeOfCoincidence(of occurrences: [Character: Int]) -> Double {
+public func calculateIndexOfCoincidence(of occurrences: [Character: Int]) -> Double {
     var k: Double = 0.0
     var n: Double = 0.0
     
@@ -72,41 +63,84 @@ public func calculateIndeOfCoincidence(of occurrences: [Character: Int]) -> Doub
     return k / (n * (n - 1))
 }
 
-public func next(character: Character, add: Int) -> Character {
-    let index = ((Int(character.asciiValue!) - 97) + add) % alphabet.count
+public func prev(character: Character) -> Character {
+    let index = ((Int(character.asciiValue!) - 97) + 25) % alphabet.count
     return alphabet[index]
 }
 
 public let alphabet: [Character] = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
 
-public func keyIndices(groups: [[(Character, Int)]],
-                       alphabetFrequencies: [Character: Double]) -> [Int?] {
-    let indicesOfKey = groups.map { (characters) -> Int? in
-        let chiSquare = alphabet.indices
-            .map { (index) -> Double in
-                let characters = characters.map { (next(character: $0.0, add: index), $0.1) }
-                let score = characters.reduce(0.0) { (result, args)  in
-                    let (character, freq) = args
-                    guard let alphabetFrequencie = alphabetFrequencies[character] else {
-                        print(character)
-                        return 0
-                    }
-                    let freqExpected = alphabetFrequencie * Double(characters.count)
-                    let freqActual = Double(freq)
-                    return result + (pow((freqActual - freqExpected), 2) / freqExpected)
-                }
-                
-                return score
-        }
-        chiSquare.enumerated().forEach({ (index, score) in
-            print("index=\(index) score=\(score)")
-        })
-        print()
-        let index = chiSquare.enumerated().min { $0.element < $1.element }?.offset
-        return index
+func chiSquare(for characters: [Character], alphabetFrequencies: [Character: Double]) -> Double {
+    let charactersFreq = countOccurrence(of: characters)
+    let count = charactersFreq.values.reduce(0, +)
+    
+    let score = alphabet.reduce(0.0) { (result, character)  in
+        let alphabetFrequencie = alphabetFrequencies[character]!
+        let freqExpected = alphabetFrequencie * Double(count)
+        let freqActual = Double(charactersFreq[character, default: 0])
+        return result + (pow((freqActual - freqExpected), 2) / freqExpected)
     }
     
-    return indicesOfKey
+    return score
 }
 
+public func findKey(groups: [[Character]], alphabetFrequencies: [Character: Double]) -> String {
+    let indicesOfKey = groups.map { (characters) -> Int? in
+        var characters = characters
+        let chiSquareScore = alphabet.indices
+            .map { (index) -> Double in
+                let score = chiSquare(for: characters, alphabetFrequencies: alphabetFrequencies)
+                characters = characters.map { prev(character: $0) }
+                return score
+        }
+        let index = chiSquareScore.enumerated().min { $0.element < $1.element }
+        return index?.offset
+    }
+    
+    let characters = indicesOfKey.compactMap { index in index.map { alphabet[$0] } }
+    return String(characters)
+}
 
+public func decrypt(encryptedText: String, usingKey key: String) -> String {
+    var decryptedText = ""
+    var index = 0
+    let alphabetSize: Int = alphabet.count
+    let keySize: Int = key.count
+
+    
+    for character in encryptedText {
+        let indexInAlphabet = indexOfAlphabet(forCharacter: character)
+        
+        if indexInAlphabet == -1 {
+            decryptedText.append(character)
+            continue
+        }
+        
+        let keyToEncryptWith = key[index % keySize]
+        let keyIndexInAlphabet = indexOfAlphabet(forCharacter: keyToEncryptWith)
+        let encryptedLetterIndex = (indexInAlphabet - keyIndexInAlphabet + alphabetSize) % alphabetSize
+        decryptedText.append(alphabet[encryptedLetterIndex])
+        index += 1
+    }
+    
+    return decryptedText
+}
+
+private func indexOfAlphabet(forCharacter character: Character) -> Int {
+    var index = 0
+    
+    for chr in alphabet {
+        if chr == character {
+            return index
+        }
+        index += 1
+    }
+    
+    return -1
+}
+
+extension String {
+    subscript (i: Int) -> Character {
+        return self[index(startIndex, offsetBy: i)]
+    }
+}

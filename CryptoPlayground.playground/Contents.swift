@@ -1,26 +1,18 @@
 import UIKit
 
-let url = Bundle.main.url(forResource: "cipher-text", withExtension: "txt")!
-let cipherText = try! String(contentsOf: url, encoding: .utf8)
+let cipherText = readFile(fileName: "20192-teste1", onlyLetters: true)
 
-let urlFrequencies = Bundle.main.url(forResource: "portuguese-frequencies", withExtension: "txt")!
-let frequenciesString = try! String(contentsOf: urlFrequencies, encoding: .utf8)
-let keyValues = frequenciesString.split(separator: "\n")
-    .map { line -> (Character, Double) in
-        let values = line.split(separator: ";")
-        let character = values.first?.first
-        let frequencie = Double(values.last!)
-        
-        return (character!, frequencie!)
-}
-let alphabetFrequencies = Dictionary(uniqueKeysWithValues: keyValues)
+let frequenciesString = readFile(fileName: "english-frequencies")
+let (indexOfCoindence, alphabetFrequencies) = parseFrequencies(frequenciesString: frequenciesString)
 
-let keyLengths = calculateKeyLengths(cipherText: cipherText)
+let keyLengths = calculateKeyLengths(cipherText: cipherText, indexOfCoincidence: indexOfCoindence)
 
 let keyLength = keyLengths.first!
+print("*****Achado a chave com tamanho \(keyLength.length)*****")
 
-let groups = groupCharacterByFrequencies(for: keyLength.length, with: cipherText)
+let groups = groupCharacters(for: keyLength.length, with: cipherText)
+let key = findKey(groups: groups, alphabetFrequencies: alphabetFrequencies)
 
-let indices = keyIndices(groups: groups, alphabetFrequencies: alphabetFrequencies)
+print("*****Chave \(key)*****")
 
-print(indices)
+print(decrypt(encryptedText: cipherText, usingKey: key))
