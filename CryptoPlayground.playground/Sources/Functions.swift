@@ -1,5 +1,11 @@
+//  Created by Homero and Juliana
+
 import Foundation
 
+/// Representa o alfabeto.
+private let alphabet: [Character] = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
+
+/// Retorna os tamanhos de chave a partir de um texto cifrado.
 public func calculateKeyLengths(cipherText: String, indexOfCoincidence: Double) -> [KeyLength] {
     let alphabetLength = 13
     var lengths: [KeyLength] = []
@@ -16,75 +22,11 @@ public func calculateKeyLengths(cipherText: String, indexOfCoincidence: Double) 
     return lengths
 }
 
-public func keyLengths(for length: Int, with cipherText: String) -> KeyLength {
-    let lengthsGroup: [[Character]] = groupCharacters(for: length, with: cipherText)
-    
-    let indicesOfCoincidence = lengthsGroup.map { (characters) -> Double in
-        let occurrences = countOccurrence(of: characters)
-        let indexOfCoincidence = calculateIndexOfCoincidence(of: occurrences)
-        return indexOfCoincidence
-    }
-    
-    return KeyLength(length: length, indicesOfCoincidence: indicesOfCoincidence)
-}
-
-public func countOccurrence(of characters: [Character]) -> [Character: Int] {
-    var occurrenceByCharacter: [Character: Int] = [:]
-    
-    for character in characters {
-        occurrenceByCharacter[character, default: 0] += 1
-    }
-    
-    return occurrenceByCharacter
-}
-
-public func groupCharacters(for length: Int, with cipherText: String) -> [[Character]] {
-    var lengthsGroup: [[Character]] = Array(repeating: [], count: length)
-    
-    for (index, character) in cipherText.enumerated() {
-        lengthsGroup[index % length].append(character)
-    }
-    
-    return lengthsGroup
-}
-
-public func calculateIndexOfCoincidence(of occurrences: [Character: Int]) -> Double {
-    var k: Double = 0.0
-    var n: Double = 0.0
-    
-    for (_, occurrence) in occurrences {
-        let occurrenceAsDouble = Double(occurrence)
-        k += (occurrenceAsDouble * (occurrenceAsDouble - 1))
-        n += occurrenceAsDouble
-    }
-    
-    guard n > 0 else { return 0 }
-    
-    return k / (n * (n - 1))
-}
-
-public func prev(character: Character) -> Character {
-    let index = ((Int(character.asciiValue!) - 97) + 25) % alphabet.count
-    return alphabet[index]
-}
-
-public let alphabet: [Character] = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
-
-func chiSquare(for characters: [Character], alphabetFrequencies: [Character: Double]) -> Double {
-    let charactersFreq = countOccurrence(of: characters)
-    let count = charactersFreq.values.reduce(0, +)
-    
-    let score = alphabet.reduce(0.0) { (result, character)  in
-        let alphabetFrequencie = alphabetFrequencies[character]!
-        let freqExpected = alphabetFrequencie * Double(count)
-        let freqActual = Double(charactersFreq[character, default: 0])
-        return result + (pow((freqActual - freqExpected), 2) / freqExpected)
-    }
-    
-    return score
-}
-
-public func findKey(groups: [[Character]], alphabetFrequencies: [Character: Double]) -> String {
+/// Procura a chave do texto cifrado.
+public func findKey(from cipherText: String,
+                    using key: KeyLength,
+                    alphabetFrequencies: [Character: Double]) -> String {
+    let groups = groupCharacters(for: key.length, with: cipherText)
     let indicesOfKey = groups.map { (characters) -> Int? in
         var characters = characters
         let chiSquareScore = alphabet.indices
@@ -101,46 +43,93 @@ public func findKey(groups: [[Character]], alphabetFrequencies: [Character: Doub
     return String(characters)
 }
 
+/// Decripta o texto usando uma chave
 public func decrypt(encryptedText: String, usingKey key: String) -> String {
-    var decryptedText = ""
-    var index = 0
     let alphabetSize: Int = alphabet.count
     let keySize: Int = key.count
-
+    let keyCharacters = Array(key)
     
-    for character in encryptedText {
-        let indexInAlphabet = indexOfAlphabet(forCharacter: character)
-        
-        if indexInAlphabet == -1 {
-            decryptedText.append(character)
-            continue
-        }
-        
-        let keyToEncryptWith = key[index % keySize]
-        let keyIndexInAlphabet = indexOfAlphabet(forCharacter: keyToEncryptWith)
-        let encryptedLetterIndex = (indexInAlphabet - keyIndexInAlphabet + alphabetSize) % alphabetSize
-        decryptedText.append(alphabet[encryptedLetterIndex])
-        index += 1
+    let decryptedText = encryptedText.enumerated()
+        .map { (index, character) -> Character in
+            let indexInAlphabet = Int(character.asciiValue! - 97)
+            let keyToEncryptWith = keyCharacters[index % keySize]
+            let keyIndexInAlphabet = Int(keyToEncryptWith.asciiValue! - 97)
+            let encryptedLetterIndex = (indexInAlphabet - keyIndexInAlphabet + alphabetSize) % alphabetSize
+            return alphabet[encryptedLetterIndex]
     }
     
-    return decryptedText
+    return String(decryptedText)
 }
 
-private func indexOfAlphabet(forCharacter character: Character) -> Int {
-    var index = 0
+
+// Calcula o tamanho da chave.
+private func keyLengths(for length: Int, with cipherText: String) -> KeyLength {
+    let lengthsGroup: [[Character]] = groupCharacters(for: length, with: cipherText)
     
-    for chr in alphabet {
-        if chr == character {
-            return index
-        }
-        index += 1
+    let indicesOfCoincidence = lengthsGroup.map { (characters) -> Double in
+        let occurrences = countOccurrence(of: characters)
+        let indexOfCoincidence = calculateIndexOfCoincidence(of: occurrences)
+        return indexOfCoincidence
     }
     
-    return -1
+    return KeyLength(length: length, indicesOfCoincidence: indicesOfCoincidence)
 }
 
-extension String {
-    subscript (i: Int) -> Character {
-        return self[index(startIndex, offsetBy: i)]
+/// Conta as ocurencias dos caracteres.
+private func countOccurrence(of characters: [Character]) -> [Character: Int] {
+    var occurrenceByCharacter: [Character: Int] = [:]
+    
+    for character in characters {
+        occurrenceByCharacter[character, default: 0] += 1
     }
+    
+    return occurrenceByCharacter
+}
+
+/// A groupa os caracteres por array.
+private func groupCharacters(for length: Int, with cipherText: String) -> [[Character]] {
+    var lengthsGroup: [[Character]] = Array(repeating: [], count: length)
+    
+    for (index, character) in cipherText.enumerated() {
+        lengthsGroup[index % length].append(character)
+    }
+    
+    return lengthsGroup
+}
+
+/// Calcula os indice de coincidencia do caracteres passados por parametro.
+private func calculateIndexOfCoincidence(of occurrences: [Character: Int]) -> Double {
+    var k: Double = 0.0
+    var n: Double = 0.0
+    
+    for (_, occurrence) in occurrences {
+        let occurrenceAsDouble = Double(occurrence)
+        k += (occurrenceAsDouble * (occurrenceAsDouble - 1))
+        n += occurrenceAsDouble
+    }
+    
+    guard n > 0 else { return 0 }
+    
+    return k / (n * (n - 1))
+}
+
+/// Retorna o caractere anterior. Exemplo: Se por passado `a` vai ser retornado `z`.
+private func prev(character: Character) -> Character {
+    let index = ((Int(character.asciiValue!) - 97) + 25) % alphabet.count
+    return alphabet[index]
+}
+
+/// Calcula chi square do array de caracteres.
+private func chiSquare(for characters: [Character], alphabetFrequencies: [Character: Double]) -> Double {
+    let charactersFreq = countOccurrence(of: characters)
+    let count = charactersFreq.values.reduce(0, +)
+    
+    let score = alphabet.reduce(0.0) { (result, character)  in
+        let alphabetFrequencie = alphabetFrequencies[character]!
+        let freqExpected = alphabetFrequencie * Double(count)
+        let freqActual = Double(charactersFreq[character, default: 0])
+        return result + (pow((freqActual - freqExpected), 2) / freqExpected)
+    }
+    
+    return score
 }

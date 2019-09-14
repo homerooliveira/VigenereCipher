@@ -1,5 +1,8 @@
+//  Created by Homero and Juliana
+
 import Foundation
 
+/// Faz a leitura do arquivo.
 public func readFile(fileName: String, onlyLetters: Bool = false) -> String {
     let url = Bundle.main.url(forResource: fileName, withExtension: "txt")!
     
@@ -10,6 +13,8 @@ public func readFile(fileName: String, onlyLetters: Bool = false) -> String {
     }
 }
 
+
+/// Tranforma o texto em uma tupla contendo o indice de conciendecia e dicionário de caractere e frequência do caractere
 public func parseFrequencies(frequenciesString: String) -> (Double, [Character: Double]) {
     let lines = frequenciesString.split(separator: "\n")
     
